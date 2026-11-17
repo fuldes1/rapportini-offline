@@ -1,17 +1,15 @@
-const CACHE_NAME = 'rapportini-offline-v1';
+const CACHE_NAME = 'rapportini-offline-v2';
 const ASSETS = [
   './',
   './index.html',
   './app.js',
-  './manifest.json',
-  'https://jsdelivr.net',
-  'https://jsdelivr.net',
-  'https://cloudflare.com',
-  'https://unpkg.com'
+  './manifest.json'
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)));
+  e.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
+  );
   self.skipWaiting();
 });
 
@@ -26,5 +24,13 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   if (e.request.url.includes('supabase.co')) return;
-  e.respondWith(caches.match(e.request).then((cached) => cached || fetch(e.request)));
+  e.respondWith(
+    fetch(e.request)
+      .then((res) => {
+        const resClone = res.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(e.request, resClone));
+        return res;
+      })
+      .catch(() => caches.match(e.request))
+  );
 });
