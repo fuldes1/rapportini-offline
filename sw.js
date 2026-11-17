@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rapportini-offline-v2';
+const CACHE_NAME = 'rapportini-offline-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -23,12 +23,14 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
-  if (e.request.url.includes('supabase.co')) return;
+  if (e.request.method !== 'GET' || e.request.url.includes('supabase.co')) return;
   e.respondWith(
     fetch(e.request)
       .then((res) => {
-        const resClone = res.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(e.request, resClone));
+        if (res && res.status === 200) {
+          const resClone = res.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(e.request, resClone));
+        }
         return res;
       })
       .catch(() => caches.match(e.request))
