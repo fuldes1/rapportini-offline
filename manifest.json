@@ -1,0 +1,98 @@
+{
+  "name": "Gestione Rapportini Lavoro",
+  "short_name": "Rapportini",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ff4b4b",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://flaticon.com",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
+const CACHE_NAME = 'rapportini-offline-v1';
+const ASSETS = [
+  './',
+  './index.html',
+  './app.js',
+  './manifest.json',
+  'https://jsdelivr.net',
+  'https://jsdelivr.net',
+  'https://cloudflare.com',
+  'https://unpkg.com'
+];
+
+self.addEventListener('install', (e) => {
+  e.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)));
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (e) => {
+  e.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+    )
+  );
+  self.clients.claim();
+});
+
+self.addEventListener('fetch', (e) => {
+  if (e.request.url.includes('supabase.co')) return;
+  e.respondWith(caches.match(e.request).then((cached) => cached || fetch(e.request)));
+});
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Gestione Rapportini Lavoro (Offline)</title>
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#ff4b4b">
+  <link href="https://jsdelivr.net" rel="stylesheet">
+  <script src="https://jsdelivr.net"></script>
+  <script src="https://cloudflare.com"></script>
+  <script src="https://unpkg.com"></script>
+  <style>
+    body { background-color: #f8f9fa; padding-bottom: 60px; }
+    .status-bar { position: sticky; top: 0; z-index: 1000; padding: 8px 15px; font-weight: bold; font-size: 0.9rem; }
+    .online-bg { background-color: #198754; color: white; }
+    .offline-bg { background-color: #dc3545; color: white; }
+    .card-custom { border-radius: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); margin-bottom: 15px; }
+    #qr-reader { width: 100%; max-width: 350px; margin: auto; }
+    #qrcode-container img { margin: auto; }
+  </style>
+</head>
+<body>
+
+  <div id="net-status" class="status-bar online-bg d-flex justify-content-between align-items-center">
+    <span id="net-label">🟢 Online — Sincronizzato con Supabase</span>
+    <button class="btn btn-sm btn-light fw-bold" onclick="sincronizzaTutto()">🔄 Sincronizza Ora</button>
+  </div>
+
+  <div class="container mt-3" id="app-root"></div>
+
+  <div class="modal fade" id="offlineExchangeModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-dark text-white">
+          <h5 class="modal-title" id="modalTitle">📡 Scambio Dati Senza Internet</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" onclick="fermaScanner()"></button>
+        </div>
+        <div class="modal-body text-center" id="modalBody"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://jsdelivr.net"></script>
+  <script src="./app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js');
+    }
+  </script>
+</body>
+</html>
