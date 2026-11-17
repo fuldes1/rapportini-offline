@@ -1,4 +1,4 @@
-const SUPABASE_URL = "https://supabase.co";
+const SUPABASE_URL = "https://ayvcrpysnzinwnfmylwb.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_yC-QvpAoh86cbGWCa80itw_kadE6bMf";
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -52,7 +52,6 @@ async function sincronizzaTutto() {
     return;
   }
   try {
-    // 1. Invia modifiche locali in coda a Supabase
     if (dbLocale.codaSync.length > 0) {
       const codaCopia = [...dbLocale.codaSync];
       dbLocale.codaSync = [];
@@ -86,7 +85,6 @@ async function sincronizzaTutto() {
       }
     }
 
-    // 2. Scarica stato aggiornato da Supabase in memoria locale
     const [resLav, resInt, resDip, resTit] = await Promise.all([
       sb.from('lavori').select('*').order('data', { ascending: false }),
       sb.from('intervalli_orari').select('*'),
@@ -156,7 +154,7 @@ function apriEsportaOffline(titolo, oggettoDati) {
     if (jsonStr.length <= 1200) {
       new QRCode(container, { text: jsonStr, width: 240, height: 240, correctLevel: QRCode.CorrectLevel.L });
     } else {
-      container.innerHTML = "<div class='alert alert-warning small'>Pacchetto troppo grande per un singolo QR. Usa il pulsante blu <b>Condividi / Salva File Offline</b> qui sotto (funziona senza internet con Quick Share / AirDrop).</div>";
+      container.innerHTML = "<div class='alert alert-warning small'>Pacchetto troppo grande per un singolo QR. Usa il pulsante blu <b>Condividi / Salva File Offline</b> qui sotto.</div>";
     }
   }, 300);
 }
@@ -529,7 +527,6 @@ function render() {
     `;
   }
 }
-  
 // ==========================================
 // AZIONI E SALVATAGGI LOCALI + CODA SYNC
 // ==========================================
@@ -604,57 +601,60 @@ function salvaFuoriProgramma(stato) {
 
   const locId = "loc_" + Date.now();
   const nuovoLav = { id: locId, data: dt, cliente: cli, lavoro: lav, materiali: mat, completato: stato, dipendente: state.operaio };
-  const nuovoInt = [{ id: "int_" + Date.now(), lavoro_id: locId, ora_inizio: oIn, ora_fine: oFi }];
-
   dbLocale.lavori.unshift(nuovoLav);
-  dbLocale.intervalli.push(nuovoInt[0]);
+
+  const ints = [];
+  if (oIn && oFi) {
+    const intObj = { id: "int_" + Date.now(), lavoro_id: locId, ora_inizio: oIn, ora_fine: oFi };
+    dbLocale.intervalli.push(intObj);
+    ints.push(intObj);
+  }
+
   dbLocale.codaSync.push({
     tipo: 'insert_nuovo_lavoro',
     dati: { data: dt, cliente: cli, lavoro: lav, materiali: mat, completato: stato, dipendente: state.operaio },
-    intervalliLocale: nuovoInt
+    intervalliLocale: ints
   });
   salvaLocale();
   sincronizzaTutto();
+}
+
+function assegnaLavoroTit(soloOffline) {
+  const dt = document.getElementById('ass-dt').value;
+  const dip = document.getElementById('ass-dip').value;
+  const cli = document.getElementById('ass-cli').value.trim();
+  const lav = document.getElementById('ass-lav').value.trim();
+  if (!cli || !lav) return alert("Inserisci Cliente e Descrizione lavoro!");
+
+  const locId = "loc_" + Date.now();
+  const nuovoLav = { id: locId, data: dt, cliente: cli, lavoro: lav, materiali: '', completato: 0, dipendente: dip };
+  dbLocale.lavori.unshift(nuovoLav);
+  dbLocale.codaSync.push({
+    tipo: 'insert_nuovo_lavoro',
+    dati: { data: dt, cliente: cli, lavoro: lav, materiali: '', completato: 0, dipendente: dip }
+  });
+  salvaLocale();
+
+  if (soloOffline) {
+    apriEsportaOffline("📡 Invia Lavoro al Dipendente", { azione: 'nuovo_lavoro_assegnato', lavoro: nuovoLav });
+    render();
+  } else {
+    alert("✅ Lavoro assegnato!");
+    sincronizzaTutto();
+  }
 }
 
 function inviaRapportinoOffline(lavId) {
   const lav = dbLocale.lavori.find(l => String(l.id) === String(lavId));
   if (!lav) return;
   const ints = dbLocale.intervalli.filter(i => String(i.lavoro_id) === String(lavId));
-  apriEsportaOffline(`📡 Invia Rapportino: ${lav.cliente}`, {
+  apriEsportaOffline("📡 Invia Rapportino al Titolare", {
     azione: 'invio_rapportino_dipendente',
     lavoro: lav,
     intervalli: ints
   });
 }
 
-function assegnaLavoroTit(conQrOffline) {
-  const dt = document.getElementById('ass-dt').value;
-  const dip = document.getElementById('ass-dip').value;
-  const cli = document.getElementById('ass-cli').value.trim();
-  const lav = document.getElementById('ass-lav').value.trim();
-  if (!cli || !lav) return alert("Compila Cliente e Descrizione!");
-
-  const locId = "loc_" + Date.now();
-  const nuovoLav = { id: locId, data: dt, cliente: cli, lavoro: lav, materiali: "", completato: 0, dipendente: dip };
-  dbLocale.lavori.unshift(nuovoLav);
-  dbLocale.codaSync.push({
-    tipo: 'insert_nuovo_lavoro',
-    dati: { data: dt, cliente: cli, lavoro: lav, materiali: "", completato: 0, dipendente: dip }
-  });
-  salvaLocale();
-
-  if (conQrOffline) {
-    apriEsportaOffline(`📡 Lavoro per ${dip}`, {
-      azione: 'nuovo_lavoro_assegnato',
-      lavoro: nuovoLav
-    });
-  } else {
-    alert("✅ Lavoro salvato!");
-  }
-  sincronizzaTutto();
-}
-
-// Avvio iniziale
+// Avvio automatico dell'app
 render();
 sincronizzaTutto();
